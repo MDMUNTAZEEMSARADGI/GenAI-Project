@@ -9,7 +9,6 @@ const toketokenBlacklistModel = require("../models/blacklist.model");
  * @description register a new user, expects username, email and password in the request body
  * @access Public
  */
-
 async function registerUserController(req, res) {
   const { username, email, password } = req.body;
 
@@ -60,7 +59,6 @@ async function registerUserController(req, res) {
  * @description login expects email, password in the request body
  * @access Public
  */
-
 async function loginUserController(req, res) {
   const { email, password } = req.body;
 
