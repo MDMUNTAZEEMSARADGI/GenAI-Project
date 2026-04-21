@@ -5,13 +5,15 @@ import { useAuth } from "../Hooks/useAuth";
 
 const Login = () => {
   const { loading, handleLogin } = useAuth();
+  const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    handleLogin({ email, password });
+    await handleLogin({ email, password });
+    navigate("/");
   };
 
   if (loading) {
@@ -55,7 +57,9 @@ const Login = () => {
               />
             </div>
 
-            <button className="button primary-button">Login</button>
+            <button type="submit" className="button primary-button">
+              Login
+            </button>
           </form>
           <p>
             Don't have an account? <Link to={"/register"}>Register</Link>
