@@ -1,6 +1,7 @@
 const { GoogleGenAI } = require("@google/genai");
 const { z } = require("zod");
 const { zodToJsonSchema } = require("zod-to-json-schema");
+const puppeteer = require("puppeteer");
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
@@ -10,19 +11,17 @@ const interviewReportSchema = z.object({
   matchScore: z
     .number()
     .describe(
-      "A score between 0 to 100 indicating how well the candidate's profile match the job description ",
+      "A score between 0 and 100 indicating how well the candidate's profile matches the job describe",
     ),
   technicalQuestions: z
     .array(
       z.object({
         question: z
           .string()
-          .describe("The technical questions can be asked in the interview"),
+          .describe("The technical question can be asked in the interview"),
         intention: z
           .string()
-          .describe(
-            "The intention of the interviewer behind asking the question",
-          ),
+          .describe("The intention of interviewer behind asking this question"),
         answer: z
           .string()
           .describe(
@@ -31,19 +30,17 @@ const interviewReportSchema = z.object({
       }),
     )
     .describe(
-      "The technical questions that can be asked in the inteview along with their intention and how to answer them",
+      "Technical questions that can be asked in the interview along with their intention and how to answer them",
     ),
   behavioralQuestions: z
     .array(
       z.object({
         question: z
           .string()
-          .describe("The technical questions can be asked in the interview"),
+          .describe("The technical question can be asked in the interview"),
         intention: z
           .string()
-          .describe(
-            "The intention of the interviewer behind asking the question",
-          ),
+          .describe("The intention of interviewer behind asking this question"),
         answer: z
           .string()
           .describe(
@@ -52,7 +49,7 @@ const interviewReportSchema = z.object({
       }),
     )
     .describe(
-      "Behavioral questions that can be asked in the inteview along with their intention and how to answer them",
+      "Behavioral questions that can be asked in the interview along with their intention and how to answer them",
     ),
   skillGaps: z
     .array(
@@ -61,12 +58,12 @@ const interviewReportSchema = z.object({
         severity: z
           .enum(["low", "medium", "high"])
           .describe(
-            "The severity of this skill gap, i.e How important is the skill for them",
+            "The severity of this skill gap, i.e. how important is this skill for the job and how much it can impact the candidate's chances",
           ),
       }),
     )
     .describe(
-      "List of skill gaps, in the candidate's profile along with their severity",
+      "List of skill gaps in the candidate's profile along with their severity",
     ),
   preparationPlan: z
     .array(
@@ -77,17 +74,22 @@ const interviewReportSchema = z.object({
         focus: z
           .string()
           .describe(
-            "The main focus of this day in the preparation plan, e.g. data structures, system designs, mock interview",
+            "The main focus of this day in the preparation plan, e.g. data structures, system design, mock interviews etc.",
           ),
-        task: z
-          .string()
+        tasks: z
+          .array(z.string())
           .describe(
-            "List of task to be done on this day to follow the preparation plan, e.g. read a specific book  ",
+            "List of tasks to be done on this day to follow the preparation plan, e.g. read a specific book or article, solve a set of problems, watch a video etc.",
           ),
       }),
     )
     .describe(
-      "A day wise preparation plan for the candidate to follow in order to prepare for the interview effectively",
+      "A day-wise preparation plan for the candidate to follow in order to prepare for the interview effectively",
+    ),
+  title: z
+    .string()
+    .describe(
+      "The title of the job for which the interview report is generated",
     ),
 });
 
@@ -97,20 +99,21 @@ async function generateInterviewReport({
   jobDescription,
 }) {
   const prompt = `
-You MUST return STRICT JSON only.
+Return ONLY valid JSON.
 
 DO NOT return arrays of strings.
-Each item MUST be an object with ALL required fields.
 
-Example format:
+Each question MUST be an object.
+
+Correct format:
 
 {
-  "matchScore": 85,
+  "matchScore": 90,
   "technicalQuestions": [
     {
-      "question": "Explain REST API",
-      "intention": "Check API knowledge",
-      "answer": "Explain principles like statelessness..."
+      "question": "What is React?",
+      "intention": "Check fundamentals",
+      "answer": "Explain virtual DOM..."
     }
   ],
   "behavioralQuestions": [
@@ -129,13 +132,19 @@ Example format:
   "preparationPlan": [
     {
       "day": 1,
-      "focus": "Data Structures",
-      "task": "Practice arrays and strings"
+      "focus": "DSA",
+      "tasks": ["Solve 5 problems"]
     }
-  ]
+  ],
+  "title": "..."
 }
 
-Now generate FULL structured response for:
+IMPORTANT:
+- technicalQuestions MUST be array of objects (NOT strings)
+- DO NOT use this format: ["question", "..."]
+- Always use key-value objects
+
+Now generate report.
 
 Resume: ${resume}
 Self Description: ${selfDescription}
@@ -143,7 +152,7 @@ Job Description: ${jobDescription}
 `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -151,23 +160,142 @@ Job Description: ${jobDescription}
     },
   });
 
-  return JSON.parse(response.text);
+  // return JSON.parse(response.text);
+  let parsed;
 
-//   console.log(response.text);
+  try {
+    parsed = JSON.parse(response.text);
+
+    // ✅ Validate with Zod (THIS IS KEY)
+    const validated = interviewReportSchema.parse(parsed);
+
+    return validated;
+  } catch (err) {
+    console.error("❌ AI INVALID RESPONSE:", response.text);
+    throw new Error("AI response format incorrect");
+  }
+
+  // 🔥 FIX TECHNICAL QUESTIONS
+  if (parsed.technicalQuestions) {
+    parsed.technicalQuestions = formatQuestions(parsed.technicalQuestions);
+  }
+
+  // 🔥 FIX BEHAVIORAL QUESTIONS
+  if (parsed.behavioralQuestions) {
+    parsed.behavioralQuestions = formatQuestions(parsed.behavioralQuestions);
+  }
+
+  // 🔥 FIX SKILL GAPS
+  if (parsed.skillGaps) {
+    parsed.skillGaps = formatSkillGaps(parsed.skillGaps);
+  }
+
+  // 🔥 FIX PREPARATION PLAN
+  if (parsed.preparationPlan) {
+    parsed.preparationPlan = formatPreparation(parsed.preparationPlan);
+  }
+
+  return parsed;
 }
 
-// testing
-// async function invokeGeminiAI() {
-//   try {
-//     const response = await ai.models.generateContent({
-//       model: "gemini-2.5-flash-lite",
-//       contents: "HEllo gemini ! Exaplin what interview ?",
-//     });
-//     console.log(response.text);
-//   } catch (error) {
-//     console.error("Gemini Error:", error.message);
-//   }
-// }
-// module.exports = invokeGeminiAI;
+//--
+function formatQuestions(arr) {
+  const result = [];
 
-module.exports = generateInterviewReport;
+  for (let i = 0; i < arr.length; i += 6) {
+    result.push({
+      question: arr[i + 1],
+      intention: arr[i + 3],
+      answer: arr[i + 5],
+    });
+  }
+
+  return result;
+}
+
+function formatSkillGaps(arr) {
+  const result = [];
+
+  for (let i = 0; i < arr.length; i += 4) {
+    result.push({
+      skill: arr[i + 1],
+      severity: arr[i + 3],
+    });
+  }
+
+  return result;
+}
+
+function formatPreparation(arr) {
+  const result = [];
+
+  for (let i = 0; i < arr.length; i += 6) {
+    result.push({
+      day: arr[i + 1],
+      focus: arr[i + 3],
+      tasks: [arr[i + 5]],
+    });
+  }
+
+  return result;
+}
+
+async function generatePdfFromHtml(htmlContent) {
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+
+  const pdfBuffer = await page.pdf({
+    format: "A4",
+    margin: {
+      top: "20mm",
+      bottom: "20mm",
+      left: "15mm",
+      right: "15mm",
+    },
+  });
+
+  await browser.close();
+
+  return pdfBuffer;
+}
+
+async function generateResumePdf({ resume, selfDescription, jobDescription }) {
+  const resumePdfSchema = z.object({
+    html: z
+      .string()
+      .describe(
+        "The HTML content of the resume which can be converted to PDF using any library like puppeteer",
+      ),
+  });
+
+  const prompt = `Generate resume for a candidate with the following details:
+                        Resume: ${resume}
+                        Self Description: ${selfDescription}
+                        Job Description: ${jobDescription}
+
+                        the response should be a JSON object with a single field "html" which contains the HTML content of the resume which can be converted to PDF using any library like puppeteer.
+                        The resume should be tailored for the given job description and should highlight the candidate's strengths and relevant experience. The HTML content should be well-formatted and structured, making it easy to read and visually appealing.
+                        The content of resume should be not sound like it's generated by AI and should be as close as possible to a real human-written resume.
+                        you can highlight the content using some colors or different font styles but the overall design should be simple and professional.
+                        The content should be ATS friendly, i.e. it should be easily parsable by ATS systems without losing important information.
+                        The resume should not be so lengthy, it should ideally be 1-2 pages long when converted to PDF. Focus on quality rather than quantity and make sure to include all the relevant information that can increase the candidate's chances of getting an interview call for the given job description.
+                    `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: zodToJsonSchema(resumePdfSchema),
+    },
+  });
+
+  const jsonContent = JSON.parse(response.text);
+
+  const pdfBuffer = await generatePdfFromHtml(jsonContent.html);
+
+  return pdfBuffer;
+}
+
+module.exports = { generateInterviewReport, generateResumePdf };

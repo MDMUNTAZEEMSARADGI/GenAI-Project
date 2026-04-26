@@ -13,16 +13,20 @@ export const generateInterviewReport = async ({
   selfDescription,
   resumeFile,
 }) => {
+  console.log("Resume File:", resumeFile);
+  console.log("Is File?", resumeFile instanceof File);
+
   const formData = new FormData();
   formData.append("jobDescription", jobDescription);
   formData.append("selfDescription", selfDescription);
   formData.append("resume", resumeFile);
 
-  const response = await api.post("/api/interview/", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+  // 🔥 Check FormData
+  for (let pair of formData.entries()) {
+    console.log(pair[0], pair[1]);
+  }
+
+  const response = await api.post("/api/interview/", formData);
 
   return response.data;
 };

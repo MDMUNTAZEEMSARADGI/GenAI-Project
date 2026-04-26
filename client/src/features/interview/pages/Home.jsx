@@ -8,19 +8,54 @@ const Home = () => {
   const [jobDescription, setJobDescription] = useState("");
   const [selfDescription, setSelfDescription] = useState("");
   const resumeInputRef = useRef();
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
 
   const handleGenerateReport = async () => {
-    const resumeFile = resumeInputRef.current.files[0];
-    const data = await generateReport({
-      jobDescription,
-      selfDescription,
-      resumeFile,
-    });
-    navigate(`/interview/${data._id}`);
-  };
+    try {
+      setError("");
 
+      const resumeFile = resumeInputRef.current.files[0];
+      console.log("Resume File:", resumeFile);
+      // ✅ Validation
+      if (!jobDescription.trim()) {
+        setError("Job description is required");
+        return;
+      }
+
+      if (!resumeFile && !selfDescription.trim()) {
+        setError("Upload resume OR provide self description");
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      const data = await generateReport({
+        jobDescription,
+        selfDescription,
+        resumeFile,
+      });
+
+      if (!data || !data.interviewReport?._id) {
+        throw new Error("Invalid response from server");
+      }
+
+      navigate(`/interview/${data.interviewReport._id}`);
+    } catch (err) {
+      console.log("❌ UI ERROR:", err);
+
+      // ✅ Friendly messages
+      if (typeof err === "string") {
+        setError(err);
+      } else {
+        setError(err?.message || "Something went wrong. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   if (loading) {
     return (
       <main className="loading-screen">
@@ -139,6 +174,11 @@ const Home = () => {
                   name="resume"
                   accept=".pdf,.docx"
                 />
+                {resumeInputRef.current?.files?.[0] && (
+                  <p className="file-name">
+                    Selected: {resumeInputRef.current.files[0].name}
+                  </p>
+                )}
               </label>
             </div>
 
@@ -206,7 +246,11 @@ const Home = () => {
           <span className="footer-info">
             AI-Powered Strategy Generation &bull; Approx 30s
           </span>
-          <button onClick={handleGenerateReport} className="generate-btn">
+          <button
+            onClick={handleGenerateReport}
+            className="generate-btn"
+            disabled={isSubmitting}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -216,7 +260,7 @@ const Home = () => {
             >
               <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
             </svg>
-            Generate My Interview Strategy
+            {isSubmitting ? "Generating..." : "Generate My Interview Strategy"}
           </button>
         </div>
       </div>
