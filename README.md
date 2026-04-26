@@ -81,8 +81,8 @@ project-root/
 ### 1️⃣ Clone Repository
 
 ```
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/MDMUNTAZEEMSARADGI/GenAI-Project
+cd GenAI-Project
 ```
 
 ---
@@ -192,8 +192,7 @@ POST /api/interview/resume/pdf/:id
 
 ## 📸 Screenshots (Optional)
 
-_Add screenshots here for better presentation_
-
+yet to add
 ---
 
 ## 🚀 Future Improvements
