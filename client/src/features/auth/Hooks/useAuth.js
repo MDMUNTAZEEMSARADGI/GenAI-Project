@@ -50,13 +50,12 @@ export const useAuth = () => {
       setLoading(false);
     }
   };
-
- useEffect(() => {
+useEffect(() => {
   const getAndSetUser = async () => {
     try {
       const data = await getMe();
 
-      if (data?.user) {
+      if (data && data.user) {
         setUser(data.user);
       } else {
         setUser(null);

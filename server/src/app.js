@@ -10,7 +10,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5174",
-      "https://interviewprep-gen-ai.vercel.app/",
+      "https://interviewprep-gen-ai.vercel.app"
     ],
     credentials: true,
   }),
