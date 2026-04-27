@@ -190,9 +190,10 @@ POST /api/interview/resume/pdf/:id
 
 ---
 
-## 📸 Screenshots (Optional)
+## 📸 Screenshots
+<img width="1219" height="928" alt="Screenshot 2026-04-27 142431" src="https://github.com/user-attachments/assets/1703906b-0041-44f5-889c-5cccc5a757ed" />
 
-yet to add
+
 ---
 
 ## 🚀 Future Improvements
